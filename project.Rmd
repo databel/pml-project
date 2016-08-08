@@ -1,0 +1,85 @@
+---
+title: "Prediction Assignment Writeup"
+output: html_document
+---
+
+##Background
+We will use data collected by four accelerometers placed on the belt, forearm, arm, and dumbell of 6 young healthy participant. There are 10 different correct and incorrect ways to lift barbells. Each accelerometer  The websource of the article and more information can be found at [ http://groupware.les.inf.puc-rio.br/har]( http://groupware.les.inf.puc-rio.br/har)  (see the section on the Weight Lifting Exercise Dataset). The task is to "predict the manner in which they did the exercises." The prediction model will be used to predict 20 different test cases.  The following paper details the WLE dataset and the study.
+
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+##Getting and Cleaning Data
+The training and testing data can be downloaded from the links provided below.
+
+[https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv)
+
+[https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv)
+
+
+
+```{r,message=FALSE}
+library(caret)
+library(rpart)
+library(e1071)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+library(AppliedPredictiveModeling)
+library(knitr)
+```
+```{r,echo=TRUE}
+set.seed(222)
+#setwd("./doc/data-science/data-science-track/8-ds-machine/project")
+test1 = read.csv("./pml-testing.csv", header=T)
+train1 = read.csv("./pml-training.csv", header=T)
+
+dim(test1)
+dim(train1)
+
+#From test data: Remove the first 7 variables as they are not relevant, remove columns with NA. Get the 53 variable names. There are 52 common variables that the 2 datasets have in common except the 53th: problem_id and classe.  
+varNames1 = names(test1[,colSums(is.na(test1)) == 0])[8:160]
+varNames1 = varNames1[1:53]
+
+varNames2 = names(train1[,colSums(is.na(train1)) == 0])[8:160]
+
+test2 = test1[,c(varNames1)]
+
+# Clean the training data to be similar to the testing data.
+train2 = train1[,c(varNames1[1:52],"classe")]
+
+#Partition train data into 2 sets: 60% for training, 40% for testing.
+Train60 = createDataPartition(train2$classe, p=0.6, list=FALSE)
+Testing = train2[-Train60, ]
+Training = train2[Train60, ]
+
+```
+
+##Training Using Decision Trees and Random Forest
+```{r}
+#modFit = train(classe ~., method="rpart",data=Training )
+modFitTrees = rpart(classe ~ ., method="class",data=Training)
+fancyRpartPlot(modFitTrees) 
+
+modFitForest = randomForest(classe ~ .,data=Training)
+
+```
+## Confusion Matrix and Statistics
+```{r}
+predictTrees = predict(modFitTrees,Testing,type="class")
+predictForest = predict(modFitForest,Testing,type="class")
+
+CMTrees = confusionMatrix(predictTrees,Testing$classe)
+CMForest = confusionMatrix(predictForest,Testing$classe)
+
+CMTrees
+CMForest
+
+```
+
+##Final Results with the Test Data
+The random forest fit has a better accuracy at 99.31% than the decision trees fit with accuracy at 74.88%. The out-of-sample error for random forest = 1 - 0.9931 = 0.0069. The out-of-sample error for decision trees = 1 - 0.7488 = 0.2512. I will use the random forest to predict the 20 cases in the test data as shown below. The prediction results were submitted to the course project prediction quiz.
+```{r}
+prediction = predict(modFitForest,test2,type="class")
+prediction
+```
